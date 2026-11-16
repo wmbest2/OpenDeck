@@ -115,20 +115,23 @@ export async function renderImage(
 			(state.style.includes("Bold") ? "bold " : "") + (state.style.includes("Italic") ? "italic " : "") + `${size}px "${state.family}", sans-serif`;
 		context.fillStyle = state.colour;
 		context.strokeStyle = state.stroke_colour;
-		context.lineWidth = state.stroke_size * scale;
+		// Canvas ignores a lineWidth of 0 (keeping the default 1px), so an outline size of 0
+		// must skip the stroke entirely rather than set the width to 0.
+		const strokeWidth = Math.max(0, Number(state.stroke_size) || 0) * scale;
+		if (strokeWidth > 0) context.lineWidth = strokeWidth;
 		context.textBaseline = "top";
 		const x = canvas.width / 2;
 		let y = canvas.height / 2 - size * textSource.split("\n").length * 0.5;
 		switch (state.alignment) {
 			case "top":
-				y = context.lineWidth;
+				y = strokeWidth;
 				break;
 			case "bottom":
-				y = canvas.height - size * textSource.split("\n").length - context.lineWidth;
+				y = canvas.height - size * textSource.split("\n").length - strokeWidth;
 				break;
 		}
 		for (const [index, line] of Object.entries(textSource.split("\n"))) {
-			context.strokeText(line, x, y + size * parseInt(index));
+			if (strokeWidth > 0) context.strokeText(line, x, y + size * parseInt(index));
 			context.fillText(line, x, y + size * parseInt(index));
 			if (state.underline) {
 				const width = context.measureText(line).width;
