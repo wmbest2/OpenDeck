@@ -19,6 +19,12 @@ pub async fn register_device(uuid: &str, mut event: PayloadEvent<crate::shared::
 		}
 
 		event.payload.plugin = uuid.to_owned();
+		if let Some(size) = event.payload.key_size
+			&& !crate::shared::KEY_SIZE_RANGE.contains(&size)
+		{
+			log::warn!("Ignoring out-of-range key size {size} for device {}", event.payload.id);
+			event.payload.key_size = None;
+		}
 		let _ = crate::events::outbound::devices::device_did_connect(&event.payload.id, (&event.payload).into()).await;
 		DEVICES.insert(event.payload.id.clone(), event.payload.clone());
 		let _ = crate::events::outbound::devices::set_device_brightness(&event.payload.id, crate::store::get_settings().value.brightness).await;

@@ -7,4 +7,6 @@ export type DeviceInfo = {
 	touchpoints: number;
 	infobars: number;
 	type: number;
+	// Native key image size in pixels, when the device plugin declares one.
+	keySize?: number;
 };
