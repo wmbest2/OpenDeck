@@ -4,8 +4,13 @@
 	import { t } from "$lib/i18n";
 	import { renderImage, resizeImage } from "$lib/rendererHelper";
 
+	import FontPicker from "./FontPicker.svelte";
+
 	import { invoke } from "@tauri-apps/api/core";
 	import { onMount } from "svelte";
+
+	// Fonts shipped with OpenDeck, listed above the system fonts.
+	const BUNDLED_FONTS = ["Liberation Sans", "Archivo Black", "Comic Neue", "Courier Prime", "Tinos", "Anton", "Liberation Serif", "Open Sans", "Fira Sans"];
 
 	export let instance: ActionInstance;
 	export let showEditor: boolean;
@@ -256,28 +261,13 @@
 			</div>
 			<div class="flex flex-row items-center">
 				<label for="editor-font" class="mr-2">{$t("instance_editor.font")}</label>
-				<input
-					list="families"
+				<FontPicker
 					bind:value={instance.states[state].family}
+					bundled={BUNDLED_FONTS}
+					system={fonts}
 					placeholder={$t("instance_editor.font.placeholder")}
-					class="w-full px-1 text-neutral-300 bg-neutral-600 border border-neutral-500 rounded-lg"
 					id="editor-font"
 				/>
-				<datalist id="families">
-					<option value="Liberation Sans">Liberation Sans</option>
-					<option value="Archivo Black">Archivo Black</option>
-					<option value="Comic Neue">Comic Neue</option>
-					<option value="Courier Prime">Courier Prime</option>
-					<option value="Tinos">Tinos</option>
-					<option value="Anton">Anton</option>
-					<option value="Liberation Serif">Liberation Serif</option>
-					<option value="Open Sans">Open Sans</option>
-					<option value="Fira Sans">Fira Sans</option>
-					<option disabled>──────────</option>
-					{#each fonts as font}
-						<option value={font}>{font}</option>
-					{/each}
-				</datalist>
 			</div>
 			<div class="flex flex-row items-center">
 				<label for="editor-bold" class="mr-3 font-bold">B</label>
