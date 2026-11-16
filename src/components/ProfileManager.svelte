@@ -4,6 +4,7 @@
 
 	import Browsers from "phosphor-svelte/lib/Browsers";
 	import Copy from "phosphor-svelte/lib/Copy";
+	import DotsSixVertical from "phosphor-svelte/lib/DotsSixVertical";
 	import FloppyDisk from "phosphor-svelte/lib/FloppyDisk";
 	import Pencil from "phosphor-svelte/lib/Pencil";
 	import Trash from "phosphor-svelte/lib/Trash";
@@ -15,9 +16,57 @@
 	import { invoke } from "@tauri-apps/api/core";
 	import { listen } from "@tauri-apps/api/event";
 	import { message } from "@tauri-apps/plugin-dialog";
+	import { tick } from "svelte";
 
+	// Profiles grouped by folder ("" = top level), each list already in the user's order:
+	// get_profiles returns menu order, and these arrays are never re-sorted.
 	let folders: { [name: string]: string[] } = {};
 	let value: string;
+
+	// Drag-to-reorder within a folder group. The list reorders live while dragging and the
+	// order is saved on drop (or when the drag ends anywhere else).
+	let dragging: { folder: string; profile: string } | null = null;
+	let orderChanged = false;
+
+	function saveOrder() {
+		const order = Object.entries(folders)
+			.sort()
+			.flatMap(([_, profiles]) => profiles);
+		invoke("set_profile_order", { device: device.id, order });
+	}
+
+	function moveProfile(folder: string, profile: string, toIndex: number) {
+		const list = folders[folder];
+		const from = list.indexOf(profile);
+		if (from == -1 || toIndex < 0 || toIndex >= list.length || from == toIndex) return false;
+		list.splice(from, 1);
+		list.splice(toIndex, 0, profile);
+		folders = folders;
+		return true;
+	}
+
+	function dragOver(event: DragEvent, folder: string, target: string) {
+		if (!dragging || dragging.folder != folder) return;
+		event.preventDefault();
+		if (target != dragging.profile && moveProfile(folder, dragging.profile, folders[folder].indexOf(target))) orderChanged = true;
+	}
+
+	function endDrag() {
+		if (dragging && orderChanged) saveOrder();
+		dragging = null;
+		orderChanged = false;
+	}
+
+	async function keyboardMove(event: KeyboardEvent, folder: string, profile: string) {
+		const step = event.key == "ArrowUp" ? -1 : event.key == "ArrowDown" ? 1 : 0;
+		if (!step) return;
+		event.preventDefault();
+		if (!moveProfile(folder, profile, folders[folder].indexOf(profile) + step)) return;
+		saveOrder();
+		await tick();
+		document.getElementById(`profile-handle-${encodeURIComponent(profile)}`)?.focus();
+	}
+
 	async function getProfiles(device: DeviceInfo) {
 		let profiles: string[] = await invoke("get_profiles", { device: device.id });
 		folders = {};
@@ -45,10 +94,13 @@
 		profile = await invoke("get_selected_profile", { device: device.id });
 
 		let folder = id.includes("/") ? id.split("/")[0] : "";
+		const isNew = !folders[folder]?.includes(id);
 		if (folders[folder]) {
-			if (!folders[folder].includes(id)) folders[folder].push(id);
+			if (isNew) folders[folder].push(id);
 		} else folders[folder] = [id];
 		folders = folders;
+		// Keep a new profile where it appears: at the end of its group.
+		if (isNew) saveOrder();
 
 		$inspectedInstance = null;
 	}
@@ -107,18 +159,21 @@
 		const oldFolder = oldId.includes("/") ? oldId.split("/")[0] : "";
 		const newFolder = newId.includes("/") ? newId.split("/")[0] : "";
 
-		// Remove from old folder
-		if (folders[oldFolder]) {
-			const index = folders[oldFolder].indexOf(oldId);
+		const index = folders[oldFolder]?.indexOf(oldId) ?? -1;
+		if (oldFolder == newFolder && index != -1) {
+			// Same folder: keep its place (the backend keeps it in the saved order too).
+			folders[oldFolder][index] = newId;
+		} else {
+			// Remove from old folder
 			if (index != -1) {
 				folders[oldFolder].splice(index, 1);
 				if (folders[oldFolder].length == 0 && oldFolder != "") delete folders[oldFolder];
 			}
-		}
 
-		// Add to new folder
-		if (folders[newFolder]) folders[newFolder].push(newId);
-		else folders[newFolder] = [newId];
+			// Add to new folder
+			if (folders[newFolder]) folders[newFolder].push(newId);
+			else folders[newFolder] = [newId];
+		}
 
 		folders = folders;
 		renamingProfile = null;
@@ -195,12 +250,12 @@
 		{#each Object.entries(folders).sort() as [id, profiles]}
 			{#if id && profiles.length}
 				<optgroup label={id}>
-					{#each profiles.sort() as profile}
+					{#each profiles as profile}
 						<option value={profile}>{profile.split("/")[1]}</option>
 					{/each}
 				</optgroup>
 			{:else}
-				{#each profiles.sort() as profile}
+				{#each profiles as profile}
 					<option value={profile}>{profile}</option>
 				{/each}
 			{/if}
@@ -259,8 +314,33 @@
 			{#if id && profiles.length}
 				<h4 class="py-2 font-bold text-lg text-neutral-300">{id}</h4>
 			{/if}
-			{#each profiles.sort() as profile}
-				<div class="flex flex-row items-center py-2 space-x-2" class:ml-6={id} class:pl-2={id}>
+			{#each profiles as profile (profile)}
+				<div
+					class="flex flex-row items-center py-2 space-x-2"
+					class:ml-6={id}
+					class:pl-2={id}
+					class:opacity-50={dragging?.profile == profile}
+					role="listitem"
+					draggable={renamingProfile != profile && profiles.length > 1}
+					on:dragstart={(event) => {
+						dragging = { folder: id, profile };
+						if (event.dataTransfer) event.dataTransfer.effectAllowed = "move";
+					}}
+					on:dragover={(event) => dragOver(event, id, profile)}
+					on:drop|preventDefault={endDrag}
+					on:dragend={endDrag}
+				>
+					{#if profiles.length > 1}
+						<button
+							id={`profile-handle-${encodeURIComponent(profile)}`}
+							class="cursor-grab text-neutral-500 hover:text-neutral-300"
+							title={$t("profile_manager.reorder")}
+							aria-label={$t("profile_manager.reorder.aria", { name: id ? profile.split("/")[1] : profile })}
+							on:keydown={(event) => keyboardMove(event, id, profile)}
+						>
+							<DotsSixVertical size="20" />
+						</button>
+					{/if}
 					<input
 						type="radio"
 						bind:group={value}

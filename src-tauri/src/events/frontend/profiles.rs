@@ -1,13 +1,19 @@
 use super::Error;
 
 use crate::shared::DEVICES;
-use crate::store::profiles::{PROFILE_STORES, acquire_locks_mut, get_device_profiles, save_profile_now};
+use crate::store::profiles::{DEVICE_STORES, PROFILE_STORES, acquire_locks_mut, save_profile_now};
 
 use tauri::{AppHandle, Emitter, Manager, command};
 
+/// The device's profiles in menu order: top-level first, then folders, each in the user's order.
 #[command]
-pub fn get_profiles(device: &str) -> Result<Vec<String>, Error> {
-	Ok(get_device_profiles(device)?)
+pub async fn get_profiles(device: String) -> Result<Vec<String>, Error> {
+	Ok(DEVICE_STORES.write().await.ordered_device_profiles(&device)?)
+}
+
+#[command]
+pub async fn set_profile_order(device: String, order: Vec<String>) -> Result<(), Error> {
+	Ok(DEVICE_STORES.write().await.set_profile_order(&device, order)?)
 }
 
 #[command]
@@ -97,6 +103,7 @@ pub async fn rename_profile(device: String, old_id: String, new_id: String, reta
 	}
 
 	locks.profile_stores.rename_profile(&DEVICES.get(&device).unwrap(), &old_id, &new_id, retain).await?;
+	locks.device_stores.rename_in_order(&device, &old_id, &new_id, retain)?;
 
 	Ok(())
 }

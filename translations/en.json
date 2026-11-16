@@ -88,6 +88,8 @@
 	"plugin_manager.view_logs": "View logs",
 	"plugin_manager.visit_website": "Visit website",
 	"plugin_manager.warning": "If you are experiencing issues with a plugin, please reach out on one of the {{PRODUCT_NAME}} support channels before attempting to contact the plugin developer.",
+	"profile_manager.reorder": "Drag to reorder, or focus and use the arrow keys",
+	"profile_manager.reorder.aria": "Move {{name}} (arrow keys)",
 	"profile_manager.application_profiles": "Application profiles",
 	"profile_manager.application_profiles.aria": "{{name}} profile",
 	"profile_manager.application_profiles.hint.1": "If your application isn't listed, try switching to it and back again.",

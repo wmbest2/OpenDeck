@@ -192,6 +192,9 @@ impl ProfileStores {
 #[derive(Serialize, Deserialize)]
 pub struct DeviceConfig {
 	pub selected_profile: String,
+	/// The order the user dragged profiles into. Profiles not listed follow, alphabetically.
+	#[serde(default, skip_serializing_if = "Vec::is_empty")]
+	pub profile_order: Vec<String>,
 }
 
 impl super::NotProfile for DeviceConfig {}
@@ -201,10 +204,11 @@ pub struct DeviceStores {
 }
 
 impl DeviceStores {
-	pub fn get_selected_profile(&mut self, device: &str) -> Result<String, anyhow::Error> {
+	fn store_mut(&mut self, device: &str, selected_profile: &str) -> Result<&mut Store<DeviceConfig>, anyhow::Error> {
 		if !self.stores.contains_key(device) {
 			let default = DeviceConfig {
-				selected_profile: "Default".to_owned(),
+				selected_profile: selected_profile.to_owned(),
+				profile_order: vec![],
 			};
 
 			let store = Store::new(device, &config_dir().join("profiles"), default).context(format!("Failed to create store for device config {}", device))?;
@@ -212,26 +216,91 @@ impl DeviceStores {
 
 			self.stores.insert(device.to_owned(), store);
 		}
+		Ok(self.stores.get_mut(device).unwrap())
+	}
 
-		let from_store = &self.stores.get(device).unwrap().value.selected_profile;
+	pub fn get_selected_profile(&mut self, device: &str) -> Result<String, anyhow::Error> {
+		let from_store = self.store_mut(device, "Default")?.value.selected_profile.clone();
 		let all = get_device_profiles(device)?;
-		if all.contains(from_store) { Ok(from_store.clone()) } else { Ok(all.first().unwrap().clone()) }
+		if all.contains(&from_store) { Ok(from_store) } else { Ok(all.first().unwrap().clone()) }
 	}
 
 	pub fn set_selected_profile(&mut self, device: &str, id: String) -> Result<(), anyhow::Error> {
-		if self.stores.contains_key(device) {
-			let store = self.stores.get_mut(device).unwrap();
-			store.value.selected_profile = id;
-			store.save()?;
-		} else {
-			let default = DeviceConfig { selected_profile: id };
-
-			let store = Store::new(device, &config_dir().join("profiles"), default).context(format!("Failed to create store for device config {}", device))?;
-			store.save()?;
-
-			self.stores.insert(device.to_owned(), store);
-		}
+		let store = self.store_mut(device, &id)?;
+		store.value.selected_profile = id;
+		store.save()?;
 		Ok(())
+	}
+
+	pub fn get_profile_order(&mut self, device: &str) -> Result<Vec<String>, anyhow::Error> {
+		Ok(self.store_mut(device, "Default")?.value.profile_order.clone())
+	}
+
+	pub fn set_profile_order(&mut self, device: &str, order: Vec<String>) -> Result<(), anyhow::Error> {
+		let store = self.store_mut(device, "Default")?;
+		store.value.profile_order = order;
+		store.save()?;
+		Ok(())
+	}
+
+	/// Keeps a profile's place in the order when it is renamed, or places a duplicate
+	/// (`retain`) right after its original.
+	pub fn rename_in_order(&mut self, device: &str, old_id: &str, new_id: &str, retain: bool) -> Result<(), anyhow::Error> {
+		let store = self.store_mut(device, "Default")?;
+		let order = &mut store.value.profile_order;
+		let Some(index) = order.iter().position(|id| id == old_id) else {
+			return Ok(());
+		};
+		if retain {
+			order.insert(index + 1, new_id.to_owned());
+		} else {
+			order[index] = new_id.to_owned();
+		}
+		store.save()?;
+		Ok(())
+	}
+
+	/// The device's profiles in menu order (see [`order_profiles`]).
+	pub fn ordered_device_profiles(&mut self, device: &str) -> Result<Vec<String>, anyhow::Error> {
+		let order = self.get_profile_order(device)?;
+		Ok(order_profiles(get_device_profiles(device)?, &order))
+	}
+}
+
+/// The folder part of a profile ID ("" for top-level profiles).
+pub fn profile_folder(id: &str) -> &str {
+	id.split_once('/').map_or("", |(folder, _)| folder)
+}
+
+/// Menu order: top-level profiles first, then folders A-Z. Within each group profiles follow
+/// the user's saved `order`, and any not in it come after, alphabetically.
+pub fn order_profiles(mut profiles: Vec<String>, order: &[String]) -> Vec<String> {
+	profiles.sort();
+	profiles.dedup();
+	let rank = |id: &String| order.iter().position(|ordered| ordered == id).unwrap_or(usize::MAX);
+	profiles.sort_by(|a, b| profile_folder(a).cmp(profile_folder(b)).then(rank(a).cmp(&rank(b))).then(a.cmp(b)));
+	profiles
+}
+
+#[cfg(test)]
+mod order_tests {
+	use super::order_profiles;
+
+	fn ids(list: &[&str]) -> Vec<String> {
+		list.iter().map(|id| id.to_string()).collect()
+	}
+
+	#[test]
+	fn groups_top_level_first_then_folders_alphabetically() {
+		let profiles = ids(&["In Game", "Games/Racing", "Default", "Apps/Chat", "Discord", "Default"]);
+		assert_eq!(order_profiles(profiles, &[]), ids(&["Default", "Discord", "In Game", "Apps/Chat", "Games/Racing"]));
+	}
+
+	#[test]
+	fn saved_order_applies_within_groups_and_unlisted_follow() {
+		let profiles = ids(&["Default", "Discord", "In Game", "Games/A", "Games/B"]);
+		let order = ids(&["In Game", "Default", "Games/B", "Gone"]);
+		assert_eq!(order_profiles(profiles, &order), ids(&["In Game", "Default", "Discord", "Games/B", "Games/A"]));
 	}
 }
 
