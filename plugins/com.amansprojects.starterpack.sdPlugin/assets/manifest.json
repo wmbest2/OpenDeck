@@ -70,6 +70,16 @@
 			"PropertyInspectorPath": "propertyInspector/switchProfile.html"
 		},
 		{
+			"Icon": "icons/switchProfile",
+			"Name": "Page Indicator",
+			"States": [{ "Image": "actionDefaultImage" }],
+			"Controllers": ["Keypad"],
+			"SupportedInMultiActions": false,
+			"Tooltip": "Show the current profile's name or number",
+			"UUID": "com.amansprojects.starterpack.pageindicator",
+			"PropertyInspectorPath": "propertyInspector/pageIndicator.html"
+		},
+		{
 			"Icon": "icons/deviceBrightness",
 			"Name": "Device Brightness",
 			"States": [{ "Image": "actionDefaultImage" }],

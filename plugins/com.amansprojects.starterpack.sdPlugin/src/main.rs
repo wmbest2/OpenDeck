@@ -1,6 +1,7 @@
 mod device_brightness;
 mod input_simulation;
 mod open_url;
+mod page_indicator;
 mod run_command;
 mod switch_profile;
 
@@ -72,6 +73,7 @@ async fn main() -> OpenActionResult<()> {
 	register_action(open_url::OpenUrlAction).await;
 	register_action(run_command::RunCommandAction).await;
 	register_action(switch_profile::SwitchProfileAction).await;
+	register_action(page_indicator::PageIndicatorAction).await;
 
 	run(std::env::args().collect()).await
 }

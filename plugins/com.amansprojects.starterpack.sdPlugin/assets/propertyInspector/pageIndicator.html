@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<script>
+			let update = () => {};
+
+			function connectElgatoStreamDeckSocket(inPort, inPropertyInspectorUUID, inRegisterEvent, inInfo, inActionInfo) {
+				const websocket = new WebSocket("ws://127.0.0.1:" + inPort);
+				inActionInfo = JSON.parse(inActionInfo);
+				websocket.onopen = () => {
+					websocket.send(JSON.stringify({ event: inRegisterEvent, uuid: inPropertyInspectorUUID }));
+				};
+
+				const display = document.getElementById("display");
+				display.value = inActionInfo.payload.settings.display ?? "name";
+
+				update = () => {
+					websocket.send(
+						JSON.stringify({
+							event: "setSettings",
+							context: inActionInfo.context,
+							payload: { display: display.value },
+						}),
+					);
+				};
+			}
+		</script>
+		<link rel="stylesheet" href="sdpi.css" />
+	</head>
+	<body>
+		<div class="sdpi-item">
+			<div class="sdpi-item-label">Show</div>
+			<select id="display" onchange="update()" class="sdpi-item-value">
+				<option value="name">Profile name</option>
+				<option value="number">Profile number</option>
+				<option value="number_of_total">Number / total (e.g. 2/5)</option>
+			</select>
+		</div>
+		<div class="sdpi-item">
+			<div class="sdpi-item-label"></div>
+			<div class="sdpi-item-value" style="opacity: 0.7">
+				Place it on a key in each profile. Numbers follow the profile menu's order (drag to reorder under Edit profiles), the same order Next / Previous profile
+				uses. Font, size and position follow the key's title settings.
+			</div>
+		</div>
+	</body>
+</html>
