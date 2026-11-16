@@ -245,6 +245,14 @@
 					class="px-0.5 w-14 text-neutral-300 bg-neutral-600 border border-neutral-500 rounded-lg"
 					id="editor-outline"
 				/>
+				<label for="editor-offset" class="ml-4 mr-2" title={$t("instance_editor.offset.hint")}>{$t("instance_editor.offset")}</label>
+				<input
+					type="number"
+					bind:value={instance.states[state].text_offset}
+					step="1"
+					class="px-0.5 w-14 text-neutral-300 bg-neutral-600 border border-neutral-500 rounded-lg"
+					id="editor-offset"
+				/>
 			</div>
 			<div class="flex flex-row items-center">
 				<label for="editor-font" class="mr-2">{$t("instance_editor.font")}</label>

@@ -163,6 +163,10 @@ pub struct ActionState {
 	pub stroke_size: FontSize,
 	#[serde(alias = "FontUnderline")]
 	pub underline: bool,
+	// Note: this is not a real manifest property; it is only used internally.
+	/// Vertical nudge for the title in pixels of the 144px key canvas; positive moves it down.
+	/// Lets a glyph that sits high or low in its font box (e.g. "+") be centred by eye.
+	pub text_offset: i16,
 }
 
 impl Default for ActionState {
@@ -184,6 +188,7 @@ impl Default for ActionState {
 			size: FontSize(16),
 			stroke_size: FontSize(3),
 			underline: false,
+			text_offset: 0,
 		}
 	}
 }

@@ -130,6 +130,8 @@ export async function renderImage(
 				y = canvas.height - size * textSource.split("\n").length - strokeWidth;
 				break;
 		}
+		// Manual nudge for glyphs that sit off-centre in their font box (older profiles lack it).
+		y += (Number(state.text_offset) || 0) * scale;
 		for (const [index, line] of Object.entries(textSource.split("\n"))) {
 			if (strokeWidth > 0) context.strokeText(line, x, y + size * parseInt(index));
 			context.fillText(line, x, y + size * parseInt(index));

@@ -15,4 +15,6 @@ export type ActionState = {
 	size: number;
 	stroke_size: number;
 	underline: boolean;
+	// Vertical title nudge in pixels of the 144px canvas; positive moves it down.
+	text_offset: number;
 };
