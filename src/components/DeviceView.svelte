@@ -189,6 +189,7 @@
 							on:dragstart={(event) => handleDragStart(event, "Keypad", r * device.columns + c)}
 							{handlePaste}
 							size={device.id.startsWith("sd-") && device.rows == 4 && device.columns == 8 ? 192 : 144}
+							deviceSize={device.keySize}
 							label="{$t('device_view.key')} {String.fromCharCode(65 + r)}{c + 1}"
 							tabindex={focusedRow === r && focusedCol === c ? 0 : -1}
 						/>
@@ -241,6 +242,7 @@
 					on:dragstart={(event) => handleDragStart(event, "Keypad", device.rows * device.columns + i)}
 					{handlePaste}
 					size={device.id.startsWith("sd-") && device.rows == 4 && device.columns == 8 ? 192 : 144}
+					deviceSize={device.keySize}
 					isTouchPoint
 					label="{$t('device_view.touchpoint')} {i + 1}"
 					tabindex={focusedRow === touchpointRowIndex && focusedCol === i ? 0 : -1}

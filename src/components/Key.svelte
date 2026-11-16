@@ -153,6 +153,17 @@
 	// Canvas resolution defaults to a square `size`, but rectangular controllers (e.g. the Neo's infobar) can override this.
 	export let width: number = size;
 	export let height: number = size;
+	// When set, the image sent to the device is rendered separately at this native size
+	// (the editor keeps its full-size canvas), so text is rasterised for the device's pixels.
+	export let deviceSize: number | undefined = undefined;
+	let deviceCanvas: HTMLCanvasElement | null = null;
+	$: if (deviceSize && (!deviceCanvas || deviceCanvas.width != deviceSize)) {
+		deviceCanvas = document.createElement("canvas");
+		deviceCanvas.width = deviceSize;
+		deviceCanvas.height = deviceSize;
+	} else if (!deviceSize) {
+		deviceCanvas = null;
+	}
 	$: (async () => {
 		const sl = structuredClone(slot);
 		if (!sl) {
@@ -168,7 +179,10 @@
 			const unlock = await lock.lock();
 			try {
 				let fallback = sl.action.states[sl.current_state]?.image ?? sl.action.icon;
-				if (state && canvas) await renderImage(canvas, context, state, fallback, showOk, showAlert, true, active, pressed, $settings?.rotation);
+				if (state && canvas) {
+					await renderImage(canvas, context, state, fallback, showOk, showAlert, true, active && !deviceCanvas, pressed, $settings?.rotation);
+					if (active && deviceCanvas) await renderImage(deviceCanvas, context, state, fallback, showOk, showAlert, true, true, pressed, $settings?.rotation);
+				}
 			} finally {
 				unlock();
 			}

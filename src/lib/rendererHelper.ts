@@ -139,10 +139,10 @@ export async function renderImage(
 				const width = context.measureText(line).width;
 				// Set to black for the outline, since it uses the same fill style info as the text colour.
 				context.fillStyle = "black";
-				context.fillRect(x - width / 2 - 3, y + size * parseInt(index) + size, width + 6, 9);
+				context.fillRect(x - width / 2 - 3 * scale, y + size * parseInt(index) + size, width + 6 * scale, 9 * scale);
 				// Reset to the user's choice of text colour.
 				context.fillStyle = state.colour;
-				context.fillRect(x - width / 2, y + size * parseInt(index) + size + 4, width, 3);
+				context.fillRect(x - width / 2, y + size * parseInt(index) + size + 4 * scale, width, 3 * scale);
 			}
 		}
 	}

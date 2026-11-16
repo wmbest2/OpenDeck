@@ -43,7 +43,15 @@ pub struct DeviceInfo {
 	#[serde_inline_default(0)]
 	pub infobars: u8,
 	pub r#type: u8,
+	/// Edge length in pixels of the images the device's key screens display natively.
+	/// When present, key images sent to the device are rendered at this size instead of
+	/// the editor's canvas size, so text is rasterised at the device's own resolution.
+	#[serde(default, rename = "keySize", skip_serializing_if = "Option::is_none")]
+	pub key_size: Option<u16>,
 }
+
+/// Smallest and largest key image size a device plugin may request.
+pub const KEY_SIZE_RANGE: std::ops::RangeInclusive<u16> = 16..=512;
 
 pub static DEVICES: LazyLock<DashMap<String, DeviceInfo>> = LazyLock::new(DashMap::new);
 
