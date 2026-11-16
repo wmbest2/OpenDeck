@@ -1,84 +1,137 @@
 <!doctype html>
 <html lang="en">
 	<head>
+		<meta charset="utf-8" />
 		<script>
+			// Values that switch relative to the current profile (handled by OpenDeck).
+			// NUL can never appear in a profile (file) name, so these cannot clash with one.
+			const NEXT = "\u0000next";
+			const PREVIOUS = "\u0000previous";
+			const NEXT_IN_FOLDER = "\u0000next_in_folder";
+			const PREVIOUS_IN_FOLDER = "\u0000previous_in_folder";
+			const DIRECTIONS = [NEXT, PREVIOUS, NEXT_IN_FOLDER, PREVIOUS_IN_FOLDER];
+
 			let update = () => {};
+			let deviceChanged = () => {};
+
+			// Fills a <select> with `values`, keeping `current` selected even when it is not in
+			// the list (a deleted profile, a disconnected device) so the setting is never lost.
+			function fill(select, values, current, { directions = false, missing = "not found" } = {}) {
+				select.innerHTML = "";
+				const add = (value, label, disabled = false) => {
+					const option = document.createElement("option");
+					option.value = value;
+					option.textContent = label;
+					option.disabled = disabled;
+					select.appendChild(option);
+				};
+				if (directions) {
+					add(NEXT, "→ Next profile");
+					add(PREVIOUS, "← Previous profile");
+					add(NEXT_IN_FOLDER, "→ Next profile in folder");
+					add(PREVIOUS_IN_FOLDER, "← Previous profile in folder");
+					if (values.length) add("", "──────────", true);
+				}
+				for (const value of values) add(value, value);
+				const known = values.includes(current) || (directions && DIRECTIONS.includes(current));
+				if (current != null && current !== "" && !known) add(current, `${current} (${missing})`);
+				select.value = current ?? "";
+			}
 
 			function connectElgatoStreamDeckSocket(inPort, inPropertyInspectorUUID, inRegisterEvent, inInfo, inActionInfo) {
 				const websocket = new WebSocket("ws://127.0.0.1:" + inPort);
 				inActionInfo = JSON.parse(inActionInfo);
-				websocket.onopen = () => {
-					websocket.send(
-						JSON.stringify({
-							event: inRegisterEvent,
-							uuid: inPropertyInspectorUUID,
-						}),
-					);
-				};
+				const settings = inActionInfo.payload.settings;
 
 				const device = document.getElementById("device");
-				device.value = inActionInfo.payload.settings.device ?? inActionInfo.device;
 				const profile = document.getElementById("profile");
-				profile.value = inActionInfo.payload.settings.profile ?? "Default";
 				const anticlockwise = document.getElementById("anticlockwise");
-				anticlockwise.value = inActionInfo.payload.settings.anticlockwise ?? "Default";
 				const clockwise = document.getElementById("clockwise");
-				clockwise.value = inActionInfo.payload.settings.clockwise ?? "Default";
 
-				if (inActionInfo.payload.controller == "Encoder") {
-					document.getElementById("encoder").style.display = "block";
-					document.getElementById("up-label").innerText = "Dial press";
-				}
+				// Show the saved values straight away; the lists arrive from the plugin.
+				let devices = [];
+				let profiles = [];
+				const values = {
+					device: settings.device ?? inActionInfo.device,
+					profile: settings.profile ?? "Default",
+					anticlockwise: settings.anticlockwise ?? "Default",
+					clockwise: settings.clockwise ?? "Default",
+				};
+				const render = () => {
+					fill(device, devices, values.device, { missing: "not connected" });
+					fill(profile, profiles, values.profile, { directions: true });
+					fill(anticlockwise, profiles, values.anticlockwise, { directions: true });
+					fill(clockwise, profiles, values.clockwise, { directions: true });
+				};
+				render();
+
+				websocket.onopen = () => {
+					websocket.send(JSON.stringify({ event: inRegisterEvent, uuid: inPropertyInspectorUUID }));
+				};
 
 				update = () => {
+					values.device = device.value || inActionInfo.device;
+					values.profile = profile.value;
+					values.anticlockwise = anticlockwise.value;
+					values.clockwise = clockwise.value;
 					websocket.send(
 						JSON.stringify({
 							event: "setSettings",
 							context: inActionInfo.context,
-							payload: {
-								device: device.value ?? inActionInfo.device,
-								profile: profile.value,
-								anticlockwise: anticlockwise.value,
-								clockwise: clockwise.value,
-							},
+							payload: { ...values },
+						}),
+					);
+				};
+
+				deviceChanged = () => {
+					update();
+					websocket.send(
+						JSON.stringify({
+							event: "sendToPlugin",
+							action: inActionInfo.action,
+							context: inPropertyInspectorUUID,
+							payload: { event: "getProfiles", device: values.device },
 						}),
 					);
 				};
 
 				websocket.onmessage = (event) => {
 					const data = JSON.parse(event.data);
-					if (data.event == "sendToPropertyInspector" && data.payload.event == "updateDevices") {
-						const datalist = document.getElementById("devices");
-						datalist.innerHTML = "";
-						for (const device of data.payload.devices) {
-							const option = document.createElement("option");
-							option.value = device;
-							datalist.appendChild(option);
-						}
+					if (data.event != "sendToPropertyInspector") return;
+					if (data.payload.event == "updateDevices") {
+						devices = data.payload.devices;
+						render();
+					} else if (data.payload.event == "updateProfiles" && data.payload.device == values.device) {
+						profiles = data.payload.profiles;
+						render();
 					}
 				};
+
+				if (inActionInfo.payload.controller == "Encoder") {
+					document.getElementById("encoder").style.display = "block";
+					document.getElementById("up-label").innerText = "Dial press";
+				}
 			}
 		</script>
 		<link rel="stylesheet" href="sdpi.css" />
 	</head>
 	<body>
 		<div class="sdpi-item">
-			<div class="sdpi-item-label">Device ID</div>
-			<input id="device" list="devices" type="text" oninput="update()" class="sdpi-item-value" />
-			<datalist id="devices"></datalist>
+			<div class="sdpi-item-label">Device</div>
+			<select id="device" onchange="deviceChanged()" class="sdpi-item-value"></select>
 		</div>
 		<div class="sdpi-item">
 			<div class="sdpi-item-label" id="up-label">Profile</div>
-			<input id="profile" oninput="update()" class="sdpi-item-value" />
+			<select id="profile" onchange="update()" class="sdpi-item-value"></select>
 		</div>
 		<div id="encoder" style="display: none">
 			<div class="sdpi-item">
 				<div class="sdpi-item-label">Dial rotate anticlockwise</div>
-				<input id="anticlockwise" oninput="update()" class="sdpi-item-value" />
+				<select id="anticlockwise" onchange="update()" class="sdpi-item-value"></select>
 			</div>
 			<div class="sdpi-item">
 				<div class="sdpi-item-label">Dial rotate clockwise</div>
-				<input id="clockwise" oninput="update()" class="sdpi-item-value" />
+				<select id="clockwise" onchange="update()" class="sdpi-item-value"></select>
 			</div>
 		</div>
 	</body>
