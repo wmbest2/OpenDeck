@@ -173,7 +173,9 @@ async fn init(device: AsyncStreamDeck, device_id: String) {
 				touchpoints: kind.touchpoint_count(),
 				infobars: if kind == Kind::Neo { 1 } else { 0 },
 				r#type: device_type,
-				key_size: None,
+				// Render key images at the device's own resolution instead of shrinking the
+				// editor's 144px canvas; keyless devices (e.g. the Pedal) report no size.
+				key_size: Some(kind.key_image_format().size.0 as u16).filter(|size| *size > 0),
 			},
 		},
 	)
