@@ -23,6 +23,8 @@
 	"instance_editor.image.n": "State {{n}} image",
 	"instance_editor.image.scale.decrease": "Decrease image scale",
 	"instance_editor.image.scale.increase": "Increase image scale",
+	"instance_editor.offset": "Offset",
+	"instance_editor.offset.hint": "Moves the title up (negative) or down (positive) to centre glyphs that sit off-centre in their font",
 	"instance_editor.outline": "Outline",
 	"instance_editor.show": "Show",
 	"instance_editor.solid_colour": "Use solid colour",
